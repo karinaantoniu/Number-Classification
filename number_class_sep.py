@@ -1,14 +1,16 @@
-from tensorflow.keras import datasets
-import matplotlib.pyplot as plt
-import time
-import psutil
 import os
 import cv2
+import time
 import scipy
+import keras
+import psutil
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 import tensorflow.keras.layers as tfl
-from tensorflow.keras.layers import ZeroPadding2D, Conv2D, BatchNormalization, ReLU, MaxPooling2D, Flatten, Dense
+from tensorflow.keras import datasets
+#from models.imagenet import mobilenetv2
+from tensorflow.keras.layers import ZeroPadding2D, Conv2D, BatchNormalization, ReLU, MaxPooling2D, Flatten, Dense, Dropout
 from PIL import Image, ImageOps, ImageFilter
 from tensorflow.keras.utils import to_categorical
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -70,19 +72,37 @@ for i in range(nr_batch_test):
 y_train = tf.one_hot(y_train.astype(np.int32), depth=10)
 y_test = tf.one_hot(y_test.astype(np.int32), depth=10)
 
+# print(x_train[0].shape) # (28, 28)
+
+x_train = x_train.reshape(-1, 28, 28, 1)  # (60000, 28, 28, 1)
+x_test = x_test.reshape(-1, 28, 28, 1)    # (10000, 28, 28, 1)
+
 # build the model
 model = tf.keras.Sequential([
-    ZeroPadding2D(padding=(3,3), data_format='channels_last', input_shape=(28, 28, 1)),
-    Conv2D(strides=1, filters=32, kernel_size=(3, 3), padding='same', activation='relu'),
-    Conv2D(strides=1, filters=32, kernel_size=(3, 3), padding='same', activation='relu'),
-    MaxPooling2D(strides=(2,2)),
+    keras.layers.SeparableConv2D(filters=32, kernel_size=(3, 3), strides=(1, 1), padding='same', input_shape=(28, 28, 1)),
+    BatchNormalization(),
+    ReLU(),
 
-    Conv2D(strides=1, filters=32, kernel_size=(3, 3), padding='same', activation='relu'),
-    Conv2D(strides=1, filters=32, kernel_size=(3, 3), padding='same', activation='relu'),
-    MaxPooling2D(strides=(2,2)),
+	keras.layers.SeparableConv2D(filters=32, kernel_size=(3, 3), strides=(1, 1), padding='same'),
+    BatchNormalization(),
+    ReLU(),
+	MaxPooling2D(),
+    Dropout(0.25),
 
-    Flatten(),
-    tfl.Dense(units=10, activation='softmax')
+	keras.layers.SeparableConv2D(filters=64, kernel_size=(3, 3), strides=(1, 1), padding='same'),
+    BatchNormalization(),
+    ReLU(),
+
+	keras.layers.SeparableConv2D(filters=64, kernel_size=(3, 3), strides=(1, 1), padding='same'),
+    BatchNormalization(),
+    ReLU(),
+	MaxPooling2D(),
+    Dropout(0.3),
+
+	Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.35),
+	Dense(10, activation='softmax')
 ])
 
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -102,8 +122,8 @@ memory_used = end_memory - start_memory
 
 print("The test loss is: ", loss)
 print("The test accuracy is: ", accuracy)
-print("Total time ", total_time, " seconds")
-print("Memory used ", memory_used, " MB")
+print("Total time ", total_time, "seconds")
+print("Memory used ", memory_used, "MB")
 
 # confussion matrix
 y_pred = model.predict(x_test, verbose=0)
